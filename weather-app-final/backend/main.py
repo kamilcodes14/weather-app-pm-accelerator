@@ -19,7 +19,7 @@ load_dotenv()
 OWM_API_KEY = os.getenv("OWM_API_KEY", "YOUR_OPENWEATHERMAP_API_KEY")
 OWM_BASE    = "https://api.openweathermap.org/data/2.5"
 OWM_GEO     = "https://api.openweathermap.org/geo/1.0"
-DB_PATH     = "weather.db"
+DB_PATH     = os.getenv("DB_PATH", "/tmp/weather.db" if os.getenv("VERCEL") else "weather.db")
 
 # ── Database ──────────────────────────────────────────────────────────────────
 def get_db():
@@ -48,7 +48,12 @@ def init_db():
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        # Don't let a DB init failure crash the whole app (e.g. read-only FS) —
+        # /health and the weather routes should still work even if CRUD can't.
+        print(f"[startup] init_db failed: {e}")
     yield
 
 app = FastAPI(title="WeatherApp API", lifespan=lifespan)
